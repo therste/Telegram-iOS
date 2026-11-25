@@ -137,6 +137,9 @@ open class TabBarControllerImpl: ViewController, TabBarController {
     }
     
     private var debugTapCounter: (Double, Int) = (0.0, 0)
+    private var fourTapCounter: (Double, Int) = (0.0, 0)
+    public weak var fourTapTargetController: ViewController?
+    public var fourTapAction: (() -> Void)?
     
     public func frameForControllerTab(controller: ViewController) -> CGRect? {
         if let index = self.controllers.firstIndex(of: controller) {
@@ -184,13 +187,30 @@ open class TabBarControllerImpl: ViewController, TabBarController {
                     strongSelf.debugTapCounter.1 += 1
                 }
                 
-                if strongSelf.debugTapCounter.1 >= 10 {
-                    strongSelf.debugTapCounter.1 = 0
-                    
-                    strongSelf.controllers[index].tabBarItemDebugTapAction?()
-                }
-                
-                if let validLayout = strongSelf.validLayout {
+if strongSelf.debugTapCounter.1 >= 10 {
+    strongSelf.debugTapCounter.1 = 0
+
+    strongSelf.controllers[index].tabBarItemDebugTapAction?()
+}
+
+if let target = strongSelf.fourTapTargetController,
+   strongSelf.controllers[index] === target {
+    if strongSelf.fourTapCounter.0 < timestamp - 0.4 {
+        strongSelf.fourTapCounter.1 = 0
+    }
+
+    strongSelf.fourTapCounter.0 = timestamp
+    strongSelf.fourTapCounter.1 += 1
+
+    if strongSelf.fourTapCounter.1 >= 4 {
+        strongSelf.fourTapCounter.1 = 0
+        strongSelf.fourTapAction?()
+    }
+} else {
+    strongSelf.fourTapCounter.1 = 0
+}
+
+if let validLayout = strongSelf.validLayout {
                     var updatedLayout = validLayout
                     
                     if strongSelf.tabBarControllerNode.sidePlacement(for: validLayout) == nil {
