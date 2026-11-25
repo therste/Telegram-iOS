@@ -154,66 +154,34 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         self.storyUploadEventsDisposable?.dispose()
     }
     
-    public func getContactsController() -> ViewController? {
-        return self.contactsController
-    }
-    
-    public func getChatsController() -> ViewController? {
-        return self.chatListController
-    }
-    
-    public func getSettingsController() -> ViewController? {
-        return self.accountSettingsController
-    }
-    
-    public func getPrivacySettings() -> Promise<AccountPrivacySettings?>? {
-        return self.accountSettingsController?.privacySettings
-    }
-    
-    public func getNotificationExceptions() -> Promise<NotificationExceptionsList?>? {
-        return self.accountSettingsController?.notificationExceptions
-    }
-    
-    override public func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
-        let needsRootWallpaperBackgroundNode: Bool
-        if case .regular = layout.metrics.widthClass {
-            needsRootWallpaperBackgroundNode = true
-        } else {
-            needsRootWallpaperBackgroundNode = false
-        }
-        
-        if needsRootWallpaperBackgroundNode {
-            let detailsPlaceholderNode: DetailsChatPlaceholderNode
-            if let current = self.detailsPlaceholderNode {
-                detailsPlaceholderNode = current
-            } else {
-                detailsPlaceholderNode = DetailsChatPlaceholderNode(context: self.context)
-                detailsPlaceholderNode.wallpaperBackgroundNode.update(wallpaper: self.presentationData.chatWallpaper, animated: false)
-                self.detailsPlaceholderNode = detailsPlaceholderNode
-            }
-            self.updateDetailsPlaceholderNode(detailsPlaceholderNode)
-        } else if let _ = self.detailsPlaceholderNode {
-            self.detailsPlaceholderNode = nil
-            self.updateDetailsPlaceholderNode(nil)
-        }
-    
-        super.containerLayoutUpdated(layout, transition: transition)
-    }
-    
     public func addRootControllers(showCallsTab: Bool, showNewsTab: Bool) {
         let tabBarController = TabBarControllerImpl(theme: self.presentationData.theme, strings: self.presentationData.strings)
         tabBarController.navigationPresentation = .master
+
         let chatListController = self.context.sharedContext.makeChatListController(context: self.context, location: .chatList(groupId: .root), controlsHistoryPreload: true, hideNetworkActivityStatus: false, previewing: false, enableDebugActions: !GlobalExperimentalSettings.isAppStoreBuild)
+
+        tabBarController.fourTapTargetController = chatListController
+        tabBarController.fourTapAction = { [weak self] in
+            guard let strongSelf = self else {
+                return
+            }
+
+            let alert = UIAlertController(title: "ОК", message: nil, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "Закрыть", style: .default))
+            strongSelf.present(alert, animated: true)
+        }
+
         if let sharedContext = self.context.sharedContext as? SharedAccountContextImpl {
             chatListController.tabBarItem.badgeValue = sharedContext.switchingData.chatListBadge
             chatListController.tabBarItem.accessibilityValue = sharedContext.switchingData.chatListBadgeAccessibilityValue
         }
+
         let callListController = CallListController(context: self.context, mode: .tab)
         // Created even when hidden, like the calls tab: `updateRootControllers` shows and hides it.
         let newsController = NewsScreen(context: self.context)
-        
+
         var controllers: [ViewController] = []
-        
+
         if showCallsTab {
             controllers.append(callListController)
         }
@@ -221,16 +189,17 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
             controllers.append(newsController)
         }
         controllers.append(chatListController)
-        
+
         var restoreSettignsController: (ViewController & SettingsController)?
         if let sharedContext = self.context.sharedContext as? SharedAccountContextImpl {
             restoreSettignsController = sharedContext.switchingData.settingsController
         }
         restoreSettignsController?.updateContext(context: self.context)
+
         if let sharedContext = self.context.sharedContext as? SharedAccountContextImpl {
             sharedContext.switchingData = (nil, nil, nil, nil)
         }
-        
+
         let accountSettingsController = PeerInfoScreenImpl(context: self.context, updatedPresentationData: nil, peerId: self.context.account.peerId, avatarInitiallyExpanded: false, isOpenedFromChat: false, reactionSourceMessageId: nil, callMessages: [], isSettings: true)
         accountSettingsController.tabBarItemDebugTapAction = { [weak self] in
             guard let strongSelf = self else {
@@ -240,10 +209,10 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         }
         accountSettingsController.parentController = self
         controllers.append(accountSettingsController)
-                
+
         let chatsIndex = controllers.firstIndex(where: { $0 === chatListController }) ?? 0
         tabBarController.setControllers(controllers, selectedIndex: restoreSettignsController != nil ? (controllers.count - 1) : chatsIndex)
-        
+
         self.callListController = callListController
         self.newsController = newsController
         self.chatListController = chatListController
